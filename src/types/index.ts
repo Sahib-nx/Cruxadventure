@@ -1,13 +1,13 @@
 export type { destinations } from '@/data/destination'
 export { SectionWrapper } from '@/components/ui/SectionWrapper'
 export { SectionHeading } from '@/components/ui/Sectionheading'
-export { ExperienceShowcase } from '../Pages/ExperienceShowcase'
-export { TripPlanner } from "@/Pages/TripPlanner"
-export { Testimonials } from '../Pages/Testimonials'
-export { StatsSection } from '../Pages/StatsSection'
-export { DestinationMap } from "@/Pages/DestinationMap"
-export { ContactSection } from "../Pages/Contact"
-export { Newsletter } from '../Pages/Newsletter'
+export { ExperienceShowcase } from '../pages/ExperienceShowcase'
+export { TripPlanner } from "@/pages/TripPlanner"
+export { Testimonials } from '../pages/Testimonials'
+export { StatsSection } from '../pages/StatsSection'
+export { DestinationMap } from "@/pages/DestinationMap"
+export { ContactSection } from "@/pages/Contact"
+export { Newsletter } from '../pages/Newsletter'
 export { Footer } from '@/components/layout/Footer'
 
 

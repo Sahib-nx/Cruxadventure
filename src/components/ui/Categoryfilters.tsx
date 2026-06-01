@@ -10,11 +10,11 @@ const CATEGORIES: { value: DestinationCategory; icon: string; label: string }[] 
   { value: 'Trekking',  icon: '🥾', label: 'Trekking'          },
   { value: 'Nature',    icon: '🌿', label: 'Nature Journeys'   },
   { value: 'Camping',   icon: '⛺', label: 'Camping'            },
-  { value: 'Honeymoon', icon: '🌸', label: 'Honeymoon Escapes' },
+
   { value: 'Snow',      icon: '❄', label: 'Snow Expeditions'  },
   { value: 'Family',    icon: '🏡', label: 'Family Journeys'   },
 ]
-
+  // { value: 'Honeymoon', icon: '🌸', label: 'Honeymoon Escapes' },
 interface CategoryFiltersProps {
   active: DestinationCategory[]
   onChange: (cats: DestinationCategory[]) => void

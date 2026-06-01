@@ -273,3 +273,5 @@ export function Newsletter() {
     </section>
   )
 }
+
+export default Newsletter;

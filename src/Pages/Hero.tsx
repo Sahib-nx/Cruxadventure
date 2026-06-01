@@ -20,14 +20,14 @@ const wordVariants: Variants = {
     transition: {
       delay: 0.3 + i * 0.12,
       duration: 0.7,
-      ease: [0.16, 1, 0.3, 1] as const,
+      ease: 'easeOut' as const,
     },
   }),
 }
 
 const slideVariants: Variants = {
   enter: { opacity: 0, scale: 1.06 },
-  center: { opacity: 1, scale: 1, transition: { duration: 1.4, ease: [0.16, 1, 0.3, 1] as const } },
+  center: { opacity: 1, scale: 1, transition: { duration: 1.4, ease: 'easeOut' as const } },
   exit: { opacity: 0, scale: 1.02, transition: { duration: 0.8, ease: [0.55, 0, 1, 0.45] as const } },
 }
 
@@ -128,7 +128,7 @@ export function HeroSection() {
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ delay: 0.1, duration: 0.6, ease: 'easeOut' }}
           className="mb-6 flex items-center gap-3"
         >
           <span className="h-px w-10 bg-gold-500" />
@@ -166,7 +166,7 @@ export function HeroSection() {
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ delay: 0.9, duration: 0.6, ease: 'easeOut' }}
           className="font-body text-base lg:text-lg text-sand-100/70 max-w-xl mb-10 leading-relaxed"
         >
           From ancient temples to overwater paradise — we craft journeys that
@@ -177,7 +177,7 @@ export function HeroSection() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.05, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ delay: 1.05, duration: 0.6, ease: 'easeOut' }}
           className="flex flex-wrap items-center gap-4"
         >
           {/* Primary CTA */}
@@ -245,7 +245,7 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
           className="absolute bottom-1 pt-5 left-6 lg:left-20 z-20 flex items-center gap-3"
         >
           <span className="font-body text-xs tracking-[0.2em] uppercase text-sand-100/50">
@@ -338,3 +338,5 @@ function PlayIcon({ className }: { className?: string }) {
     </svg>
   )
 }
+
+export default HeroSection;

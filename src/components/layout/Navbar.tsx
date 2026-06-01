@@ -7,6 +7,7 @@ import { useScrolled } from '@/hooks/useScrolled'
 import { cn } from '@/lib/utils'
 
 const navLinks = [
+  { label: 'Home', href: '/' },
   { label: 'Destinations', href: '/destinationMap' },
   { label: 'Experiences', href: '/experiences' },
   { label: 'Plan a Trip', href: '/tripPlanner' },
@@ -24,12 +25,12 @@ export function Navbar() {
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
         className={cn(
-          'fixed top-0 left-0 right-0 z-50 transition-all duration-500',
+         'fixed top-0 left-0 right-0 z-50 h-15 lg:h-20 transition-all duration-500',
           scrolled
-            ? 'glass border-b border-white/5 py-4'
-            : 'py-6 bg-transparent'
+            ? 'bg-navy-950/95 pt-5 lg:pt-6'
+            : 'bg-transparent pt-4'
         )}
         aria-label="Main navigation"
       >
@@ -106,7 +107,7 @@ export function Navbar() {
             initial={{ opacity: 0, x: '100%' }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: '100%' }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
             className="fixed inset-0 z-40 bg-navy-950 flex flex-col justify-center items-center"
             role="dialog"
             aria-modal="true"
@@ -118,7 +119,7 @@ export function Navbar() {
                   key={link.href}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + i * 0.06, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ delay: 0.1 + i * 0.06, duration: 0.4, ease: 'easeOut' }}
                 >
                   <Link
                     href={link.href}

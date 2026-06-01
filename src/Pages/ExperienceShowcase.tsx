@@ -525,3 +525,5 @@ export function ExperienceShowcase() {
     </SectionWrapper>
   )
 }
+
+export default ExperienceShowcase;

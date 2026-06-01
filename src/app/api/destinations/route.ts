@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (featured === 'true') query.featured = true
   if (season) query.bestSeason = season
 
-  const sortMap: Record<string, Record<string, number>> = {
+  const sortMap: Record<string, Record<string, 1 | -1>> = {
     popularity: { popularity: -1 },
     price_asc: { avgPackagePrice: 1 },
     price_desc: { avgPackagePrice: -1 },
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
   const [destinations, total] = await Promise.all([
     DestinationModel.find(query)
-      .sort(sort)
+      .sort(sort as Record<string, 1 | -1>)
       .skip((page - 1) * pageSize)
       .limit(pageSize)
       .lean(),
