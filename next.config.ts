@@ -3,7 +3,6 @@ import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      // Original Unsplash domains
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
@@ -12,7 +11,10 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'plus.unsplash.com',
       },
-      // Domains added for the Kashmir & Nepal destinations
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+      },
       {
         protocol: 'https',
         hostname: 'www.bikatadventures.com',

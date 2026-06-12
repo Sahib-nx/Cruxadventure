@@ -5,6 +5,7 @@ import './globals.css'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/types'
 import ScrollToTopProvider from '@/components/providers/ScrollToTopProvider'
+import LayoutContent from '@/components/layout/LayoutContent'
 
 // ── Google Font: Plus Jakarta Sans ────────────────────────
 const jakarta = Plus_Jakarta_Sans({
@@ -72,11 +73,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <ScrollToTopProvider>
-          <Navbar />
+          <LayoutContent>
 
-          {children}
+            {children}
 
-          <Footer />
+          </LayoutContent>
         </ScrollToTopProvider>
       </body>
     </html>

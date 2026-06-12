@@ -2,7 +2,6 @@ export type { destinations } from '@/data/destination'
 export { SectionWrapper } from '@/components/ui/SectionWrapper'
 export { SectionHeading } from '@/components/ui/Sectionheading'
 export { ExperienceShowcase } from '../pages/ExperienceShowcase'
-export { TripPlanner } from "@/pages/TripPlanner"
 export { Testimonials } from '../pages/Testimonials'
 export { StatsSection } from '../pages/StatsSection'
 export { DestinationMap } from "@/pages/DestinationMap"
