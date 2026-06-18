@@ -583,3 +583,5 @@ export function AboutSection() {
     </div>
   )
 }
+
+export default AboutSection

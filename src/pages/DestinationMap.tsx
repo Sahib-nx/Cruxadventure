@@ -210,7 +210,7 @@ function DestinationCard({ destination, index }: CardProps) {
               className="mb-2 space-y-1"
               aria-label={`Highlights of ${destination.name}`}
             >
-              {destination.highlights?.slice(0, 3).map((h) => (
+              {destination.highlights?.slice(0, 3).map((h: string) => (
                 <motion.li
                   key={h}
                   variants={itemVariant}
