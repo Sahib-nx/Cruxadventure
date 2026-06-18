@@ -17,13 +17,12 @@
  * ────────────────────────────────────────────────────────────────────────────
  */
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { SectionWrapper } from '@/components/ui/SectionWrapper'
 import { CategoryFilters } from '@/components/ui/Categoryfilters'
-import { destinations } from '@/data/destination'
 import { cn } from '@/lib/utils'
 import type { DestinationCategory } from '@/types'
 
@@ -43,6 +42,24 @@ function countryToRegion(country: string): Region | null {
   if (country === 'India') return 'Kashmir'
   if (country === 'Nepal') return 'Nepal'
   return null // future-proof: unknown countries still show under "All"
+}
+
+// Adapt backend destination -> frontend shape used by this component
+function adaptDestination(d: any) {
+  const region = d.region ?? ''
+  return {
+    id: d.slug ?? d._id,
+    name: d.name,
+    image: d.thumbnail ?? d.heroImage ?? '/BgImg.jpg',
+    country: region === 'Kashmir' ? 'India' : region || 'Nepal',
+    bestSeason: Array.isArray(d.bestSeason) ? (d.bestSeason[0] ?? '') : (d.bestSeason ?? ''),
+    highlights: d.popularActivities ?? [],
+    tagline: d.shortDescription ?? '',
+    rating: typeof d.popularity === 'number' ? Math.max(0, Math.min(5, +(d.popularity / 20).toFixed(1))) : 0,
+    priceFrom: d.avgPackagePrice ?? d.avgStayPrice ?? null,
+    duration: d.duration ?? 'Varies',
+    tags: d.tags ?? [],
+  }
 }
 
 // ─── Star Rating ──────────────────────────────────────────────────────────────
@@ -78,7 +95,7 @@ function StarRating({ rating }: { rating: number }) {
 // ─── Destination Card ─────────────────────────────────────────────────────────
 
 interface CardProps {
-  destination: (typeof destinations)[number]
+  destination: any
   index: number
 }
 
@@ -87,9 +104,7 @@ function DestinationCard({ destination, index }: CardProps) {
   const [hovered, setHovered] = useState(false)
 
   function handleClick() {
-    const params = new URLSearchParams({ destination: destination.id })
-    router.push(`/#planner?${params.toString()}`)
-    document.getElementById('planner')?.scrollIntoView({ behavior: 'smooth' })
+    router.push(`/destinationMap/${destination.id}`)
   }
 
   const cardVariants = {
@@ -195,7 +210,7 @@ function DestinationCard({ destination, index }: CardProps) {
               className="mb-2 space-y-1"
               aria-label={`Highlights of ${destination.name}`}
             >
-              {destination.highlights.slice(0, 3).map((h) => (
+              {destination.highlights?.slice(0, 3).map((h) => (
                 <motion.li
                   key={h}
                   variants={itemVariant}
@@ -215,11 +230,11 @@ function DestinationCard({ destination, index }: CardProps) {
         <p className="text-sm font-body text-white/60">{destination.tagline}</p>
 
         <div className="flex items-center justify-between mt-1">
-          <StarRating rating={destination.rating} />
+          <StarRating rating={destination.rating ?? 0} />
           <div className="text-right">
             <span className="text-xs text-white/50 font-body">from </span>
             <span className="text-gold-400 font-display text-lg leading-none">
-              ${destination.priceFrom.toLocaleString()}
+              ${destination.priceFrom?.toLocaleString?.() ?? '—'}
             </span>
           </div>
         </div>
@@ -233,7 +248,7 @@ function DestinationCard({ destination, index }: CardProps) {
             <path strokeLinecap="round" strokeLinejoin="round"
               d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <span className="text-xs text-white/50 font-body">{destination.duration}</span>
+          <span className="text-xs text-white/50 font-body">{destination.duration ?? 'Varies'}</span>
         </div>
       </div>
 
@@ -253,9 +268,10 @@ function DestinationCard({ destination, index }: CardProps) {
 interface RegionTabsProps {
   active: Region
   onChange: (r: Region) => void
+  allDestinations?: any[]
 }
 
-function RegionTabs({ active, onChange }: RegionTabsProps) {
+function RegionTabs({ active, onChange, allDestinations = [] }: RegionTabsProps) {
   return (
     <div
       className="flex items-center justify-center gap-2 flex-wrap"
@@ -270,8 +286,8 @@ function RegionTabs({ active, onChange }: RegionTabsProps) {
         // here with your fetched array (e.g. `allDestinations` from useSWR)
         const count =
           value === 'All'
-            ? destinations.length
-            : destinations.filter((d) => countryToRegion(d.country) === value).length
+            ? allDestinations.length
+            : allDestinations.filter((d) => countryToRegion(d.country) === value).length
 
         return (
           <motion.button
@@ -311,8 +327,27 @@ function RegionTabs({ active, onChange }: RegionTabsProps) {
 export function DestinationMap() {
   const [activeRegion, setActiveRegion] = useState<Region>('All')
   const [activeCategories, setActiveCategories] = useState<DestinationCategory[]>([])
+  const [destinations, setDestinations] = useState<any[]>([])
   const gridRef = useRef<HTMLDivElement>(null)
   const inView = useInView(gridRef, { once: true, margin: '-80px' })
+
+  useEffect(() => {
+    let mounted = true
+    async function load() {
+      try {
+        const res = await fetch('/api/admin/destinations?page=1&pageSize=50')
+        if (!res.ok) return
+        const body = await res.json()
+        const list = Array.isArray(body.destinations) ? body.destinations : body
+        const adapted = list.map(adaptDestination)
+        if (mounted) setDestinations(adapted)
+      } catch (e) {
+        console.error('Failed to load destinations', e)
+      }
+    }
+    load()
+    return () => { mounted = false }
+  }, [])
 
   // ── Filtering logic ──────────────────────────────────────────────────────
   //
@@ -405,7 +440,7 @@ export function DestinationMap() {
         <div className="mx-auto max-w-7xl px-4">
           {/* Region tabs */}
           <div className="py-3 border-b border-white/5">
-            <RegionTabs active={activeRegion} onChange={setActiveRegion} />
+            <RegionTabs active={activeRegion} onChange={setActiveRegion} allDestinations={destinations} />
           </div>
 
           {/* Experience category chips */}
