@@ -1,4 +1,3 @@
-import { WhyWanderlust } from '@/components/ui/homeComp/Whywanderlust '
 import { HeroSection } from '@/pages/Hero'
 
 import { TripPlannerTeaser } from '@/components/ui/homeComp/Tripplannerteaser'
@@ -15,7 +14,6 @@ export default function HomePage() {
     <main className="relative">
       <HeroSection />
       <DestinationsStrip />
-      <WhyWanderlust />
       <ExperienceShowcase />
       <StatsSection />
 
