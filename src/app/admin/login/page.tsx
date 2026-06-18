@@ -10,7 +10,7 @@ export default function AdminLoginPage() {
     const searchParams = useSearchParams()
     const from = searchParams?.get('from') ?? '/admin'
 
-    const [password, setPassword] = useState('')
+    const [secret, setSecret] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
 
@@ -20,22 +20,26 @@ export default function AdminLoginPage() {
         setLoading(true)
 
         try {
-            const res = await fetch('/api/admin/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password }),
-            })
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ secret }),
+                })
 
-            const data = await res.json()
+                const data = await res.json()
 
-            if (!res.ok) {
-                setError(data.error ?? 'Incorrect password.')
-                setLoading(false)
-                return
-            }
+                if (!res.ok) {
+                    setError(data.error ?? 'Incorrect secret.')
+                    setLoading(false)
+                    return
+                }
 
-            // Hard navigate so the middleware re-evaluates with the new cookie
-            window.location.href = from
+                // Store secret in sessionStorage and navigate
+                if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('admin_secret', secret)
+                }
+
+                window.location.href = from
         } catch {
             setError('Network error. Please try again.')
             setLoading(false)
@@ -75,20 +79,20 @@ export default function AdminLoginPage() {
 
                         <div className="space-y-1.5">
                             <label
-                                htmlFor="password"
+                                htmlFor="secret"
                                 className="text-xs uppercase tracking-widest text-sand-100/50 font-semibold"
                             >
-                                Password
+                                Secret
                             </label>
                             <input
-                                id="password"
+                                id="secret"
                                 type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Enter admin password"
+                                value={secret}
+                                onChange={(e) => setSecret(e.target.value)}
+                                placeholder="Enter admin secret"
                                 required
                                 autoFocus
-                                autoComplete="current-password"
+                                autoComplete="off"
                                 className={cn(
                                     'w-full rounded-xl border bg-white/5 px-4 py-3 text-sm text-sand-100 placeholder:text-sand-100/25 transition-all duration-200 focus:outline-none focus:ring-2',
                                     error
@@ -114,10 +118,10 @@ export default function AdminLoginPage() {
 
                         <button
                             type="submit"
-                            disabled={loading || !password.trim()}
+                            disabled={loading || !secret.trim()}
                             className={cn(
                                 'w-full flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500',
-                                loading || !password.trim()
+                                loading || !secret.trim()
                                     ? 'bg-white/8 text-sand-100/25 cursor-not-allowed'
                                     : 'bg-gold-500 text-navy-900 hover:bg-gold-400 shadow-gold',
                             )}
@@ -140,7 +144,7 @@ export default function AdminLoginPage() {
                 </div>
 
                 <p className="text-center text-xs text-sand-100/20 mt-6">
-                    Session expires after 8 hours
+                    Session stored in your browser for this tab
                 </p>
             </motion.div>
         </div>

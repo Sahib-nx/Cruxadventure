@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -45,7 +45,9 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 
   async function handleLogout() {
     setLoggingOut(true)
-    await fetch('/api/admin/logout', { method: 'POST' })
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('admin_secret')
+    }
     router.push('/admin/login')
     router.refresh()
   }
@@ -114,6 +116,47 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const s = sessionStorage.getItem('admin_secret')
+    if (!s) {
+      router.push('/admin/login')
+      setCheckingAuth(false)
+      return
+    }
+
+    ;(async () => {
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: s }),
+        })
+
+        if (!res.ok) {
+          sessionStorage.removeItem('admin_secret')
+          router.push('/admin/login')
+        }
+      } catch {
+        sessionStorage.removeItem('admin_secret')
+        router.push('/admin/login')
+      } finally {
+        setCheckingAuth(false)
+      }
+    })()
+  }, [])
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-navy-950 text-sand-100">
+        Checking authentication…
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-navy-950 flex">
