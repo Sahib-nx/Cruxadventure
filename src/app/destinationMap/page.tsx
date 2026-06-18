@@ -1,4 +1,5 @@
-import { DestinationMap } from "@/types";
+import DestinationMap from "@/pages/DestinationMap";
+
 
 
 

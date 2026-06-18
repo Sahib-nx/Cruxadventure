@@ -1,4 +1,4 @@
-import { ContactSection } from "@/types";
+import ContactSection from "@/pages/Contact";
 
 
 

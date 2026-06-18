@@ -1,4 +1,5 @@
-import { ExperienceShowcase } from "@/types";
+import { ExperienceShowcase } from "@/components/ui/homeComp/Experienceshowcase";
+
 
 
 
