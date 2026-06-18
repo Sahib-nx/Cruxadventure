@@ -1,5 +1,5 @@
 import { WhyWanderlust } from '@/components/ui/homeComp/Whywanderlust '
-import { HeroSection } from '../pages/Hero'
+import { HeroSection } from '@/pages/Hero'
 import { ExperienceShowcase, Newsletter, StatsSection, Testimonials } from '@/types'
 import { TripPlannerTeaser } from '@/components/ui/homeComp/Tripplannerteaser'
 import { VisualFeedStrip } from '@/components/ui/homeComp/Visualfeedstrip'
