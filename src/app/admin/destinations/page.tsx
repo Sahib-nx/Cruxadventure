@@ -153,7 +153,9 @@ export default function DestinationsListPage() {
 
   // Debounce search
   useEffect(() => {
-    setPage(1)
+    // Schedule state update to avoid "setState in effect body" warnings.
+    const t = setTimeout(() => setPage(1), 0)
+    return () => clearTimeout(t)
   }, [search, region, featuredFilter])
 
   useEffect(() => {

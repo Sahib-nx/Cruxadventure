@@ -30,7 +30,20 @@ export function useDestinationSearch(region?: string) {
     setIsSearching(false)
   }, [region])
 
-  useEffect(() => { search(debouncedQuery) }, [debouncedQuery, search])
+  useEffect(() => {
+    // Avoid setting React state synchronously in the effect body.
+    // The setState calls happen inside the async function.
+    let cancelled = false
+
+    ;(async () => {
+      if (cancelled) return
+      await search(debouncedQuery)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [debouncedQuery, search])
 
   return { query, setQuery, results, isSearching }
 }

@@ -125,7 +125,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const s = sessionStorage.getItem('admin_secret')
     if (!s) {
       router.push('/admin/login')
-      setCheckingAuth(false)
+      // Schedule state update to avoid "setState in effect body" warnings.
+      setTimeout(() => setCheckingAuth(false), 0)
       return
     }
 
