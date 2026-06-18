@@ -321,7 +321,7 @@ export default function DestinationsListPage() {
               <AnimatePresence>
                 {data?.destinations.map((dest, i) => (
                   <motion.div
-                    key={dest._id}
+                    key={dest._id?.toString()}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}

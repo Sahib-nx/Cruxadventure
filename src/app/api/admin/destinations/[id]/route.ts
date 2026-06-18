@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import mongoose, { Types } from 'mongoose'
 import { connectToDatabase } from '@/db/connect'
 import DestinationModel from '@/db/models/Destination'
 
@@ -42,7 +43,7 @@ export async function PATCH(
   if (body.slug) {
     const conflict = await DestinationModel.findOne({
       slug: body.slug,
-      _id: { $ne: id },
+      _id: { $ne: new Types.ObjectId(id) },
     }).lean()
 
     if (conflict) {

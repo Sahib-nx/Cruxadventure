@@ -1,7 +1,7 @@
-import mongoose, { Schema, Document, Model } from 'mongoose'
+import mongoose, { Schema, Document, Model, HydratedDocument } from 'mongoose'
 import type { Destination } from '@/types'
 
-export type DestinationDoc = Destination & Document
+export type DestinationDoc = HydratedDocument<Destination>;
 
 const DestinationSchema = new Schema<DestinationDoc>(
   {

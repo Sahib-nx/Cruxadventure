@@ -1,12 +1,14 @@
+import { Types } from 'mongoose'
+
 export type { destinations } from '@/data/destination'
 export { SectionWrapper } from '@/components/ui/SectionWrapper'
 export { SectionHeading } from '@/components/ui/Sectionheading'
-export { ExperienceShowcase } from '../pages/ExperienceShowcase'
-export { Testimonials } from '../pages/Testimonials'
-export { StatsSection } from '../pages/StatsSection'
+export { ExperienceShowcase } from '@/pages/ExperienceShowcase'
+export { Testimonials } from '@/pages/Testimonials'
+export { StatsSection } from '@/pages/StatsSection'
 export { DestinationMap } from "@/pages/DestinationMap"
 export { ContactSection } from "@/pages/Contact"
-export { Newsletter } from '../pages/Newsletter'
+export { Newsletter } from '@/pages/Newsletter'
 export { Footer } from '@/components/layout/Footer'
 
 
@@ -66,7 +68,7 @@ export type Season = 'Spring' | 'Summer' | 'Autumn' | 'Winter'
 // ─── Core Destination Type ────────────────────────────────────────────────────
 
 export interface Destination {
-  _id: string
+    _id?: Types.ObjectId;
   slug: string
   name: string
   region: Region
