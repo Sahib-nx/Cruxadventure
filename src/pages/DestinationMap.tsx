@@ -11,6 +11,13 @@
  * Search takes priority: when a query is active, region + category filters apply
  * on top of the search results returned by the API.
  *
+ * ─── Pagination ──────────────────────────────────────────────────────────────
+ * Both the default browse list (/api/admin/destinations) and the search route
+ * (/api/destinations/search) are paginated with a "Load more" button.
+ * PAGE_SIZE controls how many destinations render per page (12 = 3x4 grid on lg).
+ * Changing filters/search resets pagination back to page 1.
+ * ────────────────────────────────────────────────────────────────────────────
+ *
  * ─── FUTURE: switching to backend images ────────────────────────────────────
  * Every place that needs changing when images come from an API is marked with:
  *   // 🔌 BACKEND: <explanation>
@@ -26,6 +33,9 @@ import { SectionWrapper } from '@/components/ui/SectionWrapper'
 import { CategoryFilters } from '@/components/ui/Categoryfilters'
 import { cn } from '@/lib/utils'
 import type { DestinationCategory } from '@/types'
+
+// ─── Pagination config ─────────────────────────────────────────────────────────
+const PAGE_SIZE = 12
 
 // ─── Region filter ────────────────────────────────────────────────────────────
 type Region = 'All' | 'Kashmir' | 'Nepal'
@@ -50,6 +60,7 @@ function adaptDestination(d: any) {
     name: d.name,
     image: d.thumbnail ?? d.heroImage ?? '/BgImg.jpg',
     country: region === 'Kashmir' ? 'India' : region || 'Nepal',
+    // Admin can set up to 4 best seasons; anything beyond that is trimmed here.
     bestSeason: (Array.isArray(d.bestSeason) ? d.bestSeason : d.bestSeason ? [d.bestSeason] : []).slice(0, 4) as string[],
     highlights: d.popularActivities ?? [],
     tagline: d.shortDescription ?? '',
@@ -122,7 +133,7 @@ function DestinationCard({ destination, index }: CardProps) {
     hidden: { opacity: 0, y: 48, scale: 0.97 },
     visible: {
       opacity: 1, y: 0, scale: 1,
-      transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const, delay: index * 0.08 },
+      transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const, delay: (index % PAGE_SIZE) * 0.06 },
     },
     exit: {
       opacity: 0, scale: 0.95, y: 24,
@@ -151,7 +162,6 @@ function DestinationCard({ destination, index }: CardProps) {
       animate="visible"
       exit="exit"
       className="group relative overflow-hidden rounded-2xl cursor-pointer aspect-[4/5] sm:aspect-[3/4]"
-      style={{ aspectRatio: '3/4' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={handleClick}
@@ -179,24 +189,28 @@ function DestinationCard({ destination, index }: CardProps) {
       />
 
       {/* Top badges */}
-      <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-2">
-        <span className="glass text-xs font-body font-medium text-white/80 px-3 py-1 rounded-full border border-white/10">
+      <div className="absolute top-3 sm:top-4 left-3 sm:left-4 right-3 sm:right-4 flex items-start justify-between gap-2">
+        <span className="glass text-[11px] sm:text-xs font-body font-medium text-white/80 px-2.5 sm:px-3 py-1 rounded-full border border-white/10 whitespace-nowrap">
           {destination.country === 'India' ? 'Kashmir' : destination.country}
         </span>
-        <div className="flex flex-wrap gap-1 justify-end max-w-[55%]">
-          {destination.bestSeason.map((season) => (
-            <span
-              key={season}
-              className="bg-gold-500/90 text-navy-900 text-[10px] font-body font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-            >
-              {season}
-            </span>
-          ))}
-        </div>
+
+        {/* Up to 4 admin-managed seasons, rendered as wrapping pills */}
+        {destination.bestSeason.length > 0 && (
+          <div className="flex flex-wrap gap-1 justify-end max-w-[60%]">
+            {destination.bestSeason.map((season) => (
+              <span
+                key={season}
+                className="bg-gold-500/90 text-navy-900 text-[9px] sm:text-[10px] font-body font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+              >
+                {season}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Bottom content */}
-      <div className="absolute bottom-0 left-0 right-0 p-5 flex flex-col gap-2">
+      <div className="absolute bottom-0 left-0 right-0 p-3.5 sm:p-5 flex flex-col gap-1.5 sm:gap-2">
         <AnimatePresence>
           {hovered && (
             <motion.ul
@@ -204,7 +218,7 @@ function DestinationCard({ destination, index }: CardProps) {
               initial="hidden"
               animate="visible"
               exit={{ opacity: 0, y: 16, transition: { duration: 0.2 } }}
-              className="mb-2 space-y-1"
+              className="mb-2 space-y-1 hidden sm:block"
               aria-label={`Highlights of ${destination.name}`}
             >
               {destination.highlights?.slice(0, 3).map((h: string) => (
@@ -221,16 +235,21 @@ function DestinationCard({ destination, index }: CardProps) {
           )}
         </AnimatePresence>
 
-        <h3 className="font-display text-display-md text-sand-100 leading-none tracking-tight">
+        <h3 className="font-display text-base sm:text-display-md text-sand-100 leading-none tracking-tight line-clamp-1">
           {destination.name}
         </h3>
-        <p className="text-sm font-body text-white/60 line-clamp-2 leading-snug">{destination.tagline}</p>
+        <p
+          className="text-xs sm:text-sm font-body text-white/60 leading-snug"
+          style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+        >
+          {destination.tagline}
+        </p>
 
         <div className="flex items-center justify-between mt-1">
           <StarRating rating={destination.rating ?? 0} />
           <div className="text-right">
-            <span className="text-xs text-white/50 font-body">from </span>
-            <span className="text-gold-400 font-display text-lg leading-none">
+            <span className="text-[10px] sm:text-xs text-white/50 font-body">from </span>
+            <span className="text-gold-400 font-display text-base sm:text-lg leading-none">
               ${destination.priceFrom?.toLocaleString?.() ?? '—'}
             </span>
           </div>
@@ -238,14 +257,14 @@ function DestinationCard({ destination, index }: CardProps) {
 
         <div className="flex items-center gap-1.5 mt-0.5">
           <svg
-            className="w-3.5 h-3.5 text-white/40"
+            className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white/40"
             fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
             aria-hidden="true"
           >
             <path strokeLinecap="round" strokeLinejoin="round"
               d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <span className="text-xs text-white/50 font-body">{destination.duration ?? 'Varies'}</span>
+          <span className="text-[10px] sm:text-xs text-white/50 font-body">{destination.duration ?? 'Varies'}</span>
         </div>
       </div>
 
@@ -388,6 +407,33 @@ function RegionTabs({ active, onChange, allDestinations = [] }: RegionTabsProps)
   )
 }
 
+// ─── Load More Button ─────────────────────────────────────────────────────────
+function LoadMoreButton({ onClick, loading, label }: { onClick: () => void; loading: boolean; label: string }) {
+  return (
+    <div className="col-span-full flex justify-center mt-4">
+      <motion.button
+        onClick={onClick}
+        disabled={loading}
+        whileHover={{ scale: loading ? 1 : 1.03 }}
+        whileTap={{ scale: loading ? 1 : 0.97 }}
+        className={cn(
+          'flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-body font-semibold',
+          'glass border border-white/15 text-white/85 hover:text-white hover:border-gold-500/40',
+          'transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed',
+        )}
+      >
+        {loading ? (
+          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        ) : null}
+        {loading ? 'Loading…' : label}
+      </motion.button>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export function DestinationMap() {
   const [activeRegion, setActiveRegion] = useState<Region>('All')
@@ -395,72 +441,113 @@ export function DestinationMap() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
 
-  // Full list — loaded once on mount from the admin/destinations endpoint
+  // Full list — loaded page by page from the admin/destinations endpoint
   const [allDestinations, setAllDestinations] = useState<ReturnType<typeof adaptDestination>[]>([])
-  // Search results — populated whenever a query is active
+  const [browsePage, setBrowsePage] = useState(1)
+  const [browseHasMore, setBrowseHasMore] = useState(true)
+  const [browseLoadingMore, setBrowseLoadingMore] = useState(false)
+
+  // Search results — populated whenever a query is active, also paginated
   const [searchResults, setSearchResults] = useState<ReturnType<typeof adaptDestination>[]>([])
+  const [searchPage, setSearchPage] = useState(1)
+  const [searchHasMore, setSearchHasMore] = useState(true)
+  const [searchLoadingMore, setSearchLoadingMore] = useState(false)
 
   const gridRef = useRef<HTMLDivElement>(null)
   const inView = useInView(gridRef, { once: true, margin: '-80px' })
   const debouncedQuery = useDebounce(searchQuery, 380)
+  const isSearchMode = debouncedQuery.length >= 2
 
-  // ── Initial load ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    let mounted = true
-    async function load() {
-      try {
-        const res = await fetch('/api/admin/destinations?page=1&pageSize=50')
-        if (!res.ok) return
-        const body = await res.json()
-        const list = Array.isArray(body.destinations) ? body.destinations : body
-        if (mounted) setAllDestinations(list.map(adaptDestination))
-      } catch (e) {
-        console.error('Failed to load destinations', e)
-      }
+  // ── Initial / paginated browse load ──────────────────────────────────────
+  const loadBrowsePage = useCallback(async (page: number, append: boolean) => {
+    try {
+      if (append) setBrowseLoadingMore(true)
+      const res = await fetch(`/api/admin/destinations?page=${page}&pageSize=${PAGE_SIZE}`)
+      if (!res.ok) return
+      const body = await res.json()
+      const list = Array.isArray(body.destinations) ? body.destinations : body
+      const adapted = list.map(adaptDestination)
+
+      // total/hasMore from API if present, else infer from page fullness
+      const hasMore = typeof body.hasMore === 'boolean'
+        ? body.hasMore
+        : adapted.length === PAGE_SIZE
+
+      setAllDestinations((prev) => (append ? [...prev, ...adapted] : adapted))
+      setBrowseHasMore(hasMore)
+      setBrowsePage(page)
+    } catch (e) {
+      console.error('Failed to load destinations', e)
+    } finally {
+      if (append) setBrowseLoadingMore(false)
     }
-    load()
-    return () => { mounted = false }
   }, [])
 
-  // ── Search via /api/destinations/search ──────────────────────────────────
   useEffect(() => {
-    let mounted = true
+    loadBrowsePage(1, false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-    if (!debouncedQuery || debouncedQuery.length < 2) {
+  function handleBrowseLoadMore() {
+    loadBrowsePage(browsePage + 1, true)
+  }
+
+  // ── Search via /api/destinations/search (paginated) ──────────────────────
+  const runSearch = useCallback(async (page: number, append: boolean) => {
+    try {
+      if (append) setSearchLoadingMore(true)
+      else setIsSearching(true)
+
+      const params = new URLSearchParams({
+        q: debouncedQuery,
+        page: String(page),
+        pageSize: String(PAGE_SIZE),
+      })
+      // Pass region to the search API too if one is selected — reduces server work
+      if (activeRegion !== 'All') params.set('region', activeRegion)
+
+      const res = await fetch(`/api/destinations/search?${params.toString()}`)
+      if (!res.ok) return
+      const body = await res.json()
+
+      // Supports either { results, hasMore } or a bare array (legacy)
+      const list = Array.isArray(body) ? body : (body.results ?? [])
+      const adapted = list.map(adaptDestination)
+      const hasMore = typeof body.hasMore === 'boolean'
+        ? body.hasMore
+        : adapted.length === PAGE_SIZE
+
+      setSearchResults((prev) => (append ? [...prev, ...adapted] : adapted))
+      setSearchHasMore(hasMore)
+      setSearchPage(page)
+    } catch (e) {
+      console.error('Search failed', e)
+    } finally {
+      setIsSearching(false)
+      setSearchLoadingMore(false)
+    }
+  }, [debouncedQuery, activeRegion])
+
+  useEffect(() => {
+    if (!isSearchMode) {
       setSearchResults([])
+      setSearchPage(1)
+      setSearchHasMore(true)
       setIsSearching(false)
       return
     }
-
-    setIsSearching(true)
-
-    async function doSearch() {
-      try {
-        const params = new URLSearchParams({ q: debouncedQuery })
-        // Pass region to the search API too if one is selected — reduces server work
-        if (activeRegion !== 'All') params.set('region', activeRegion)
-
-        const res = await fetch(`/api/destinations/search?${params.toString()}`)
-        if (!res.ok) return
-        const body = await res.json()
-        const list = Array.isArray(body) ? body : []
-        if (mounted) setSearchResults(list.map(adaptDestination))
-      } catch (e) {
-        console.error('Search failed', e)
-      } finally {
-        if (mounted) setIsSearching(false)
-      }
-    }
-    doSearch()
-
-    return () => { mounted = false }
+    runSearch(1, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQuery])
 
+  function handleSearchLoadMore() {
+    runSearch(searchPage + 1, true)
+  }
+
   // ── Filtering logic ──────────────────────────────────────────────────────
   // When a search query is active, filter over search results;
-  // otherwise filter over the full list.
-  const baseList = debouncedQuery.length >= 2 ? searchResults : allDestinations
+  // otherwise filter over the full (paginated) browse list.
+  const baseList = isSearchMode ? searchResults : allDestinations
   const destinations = baseList.filter((d) => {
     const regionMatch =
       activeRegion === 'All' || countryToRegion(d.country) === activeRegion
@@ -471,6 +558,12 @@ export function DestinationMap() {
 
     return regionMatch && catMatch
   })
+
+  // Region/category filters are client-side on top of already-fetched pages,
+  // so "load more" always targets the underlying fetch, not the filtered view.
+  const showLoadMore = isSearchMode ? searchHasMore : browseHasMore
+  const loadMoreLoading = isSearchMode ? searchLoadingMore : browseLoadingMore
+  const handleLoadMore = isSearchMode ? handleSearchLoadMore : handleBrowseLoadMore
 
   function clearAll() {
     setActiveRegion('All')
@@ -575,7 +668,7 @@ export function DestinationMap() {
           variants={containerVariants}
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+          className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
           layout
         >
           <AnimatePresence mode="popLayout">
@@ -640,7 +733,7 @@ export function DestinationMap() {
             </motion.div>
           )}
 
-          {/* Loading state while search is in-flight */}
+          {/* Loading state while search is in-flight (first page only) */}
           {isSearching && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -658,6 +751,15 @@ export function DestinationMap() {
               <p className="mt-3 font-body text-white/30 text-sm">Finding destinations…</p>
             </motion.div>
           )}
+
+          {/* Load more — only when filters aren't hiding the tail of the current page set */}
+          {!isSearching && destinations.length > 0 && showLoadMore && !isFiltered && (
+            <LoadMoreButton
+              onClick={handleLoadMore}
+              loading={loadMoreLoading}
+              label="Load more destinations"
+            />
+          )}
         </motion.div>
 
         {/* Result count */}
@@ -674,12 +776,13 @@ export function DestinationMap() {
               <span className="text-gold-500 font-semibold">{destinations.length}</span> result
               {destinations.length !== 1 ? 's' : ''} for{' '}
               <span className="text-white/50">&quot;{searchQuery}&quot;</span>
+              {searchHasMore && <span className="text-white/20"> (more available)</span>}
             </>
           ) : (
             <>
               Showing{' '}
               <span className="text-gold-500 font-semibold">{destinations.length}</span> of{' '}
-              <span className="text-white/50">{allDestinations.length}</span> curated destinations
+              <span className="text-white/50">{allDestinations.length}{browseHasMore ? '+' : ''}</span> curated destinations
             </>
           )}
         </motion.p>

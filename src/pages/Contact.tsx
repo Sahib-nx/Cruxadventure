@@ -198,7 +198,7 @@ function InfoCard({
 const FAQS = [
   {
     q: 'How far in advance should I book?',
-    a: 'We recommend booking 3–6 months ahead for peak season destinations. That said, we often accommodate last-minute trips — just reach out and we\'ll do our best.',
+    a: 'We recommend booking 3–6 months ahead for peak season expeditions. That said, we often accommodate last-minute trips — just reach out and we\'ll do our best.',
   },
   {
     q: 'Do you offer custom private tours?',
@@ -206,7 +206,7 @@ const FAQS = [
   },
   {
     q: 'What\'s included in your packages?',
-    a: 'All our packages include flights, accommodation, airport transfers, and a dedicated trip concierge. Activities and meals vary by package — we\'ll outline everything clearly.',
+    a: 'All our packages include permits, accommodation, transfers, and a dedicated trip concierge. Activities and meals vary by package — we\'ll outline everything clearly.',
   },
   {
     q: 'What is your cancellation policy?',
@@ -260,6 +260,7 @@ function ContactForm() {
   const [errors, setErrors] = useState<FormErrors>({})
   const [shaking, setShaking] = useState<Partial<Record<keyof FormErrors, boolean>>>({})
   const [status, setStatus] = useState<FormStatus>('idle')
+  const [errorMessage, setErrorMessage] = useState<string>('')
   const [errorDismissed, setErrorDismissed] = useState(false)
   const uid = useId()
 
@@ -298,9 +299,42 @@ function ContactForm() {
 
     setStatus('loading')
     setErrorDismissed(false)
-    await new Promise((r) => setTimeout(r, 1800))
-    // Simulate occasional error: setStatus('error') 
-    setStatus('success')
+
+    // ── Actual API call — this was previously a fake setTimeout that always
+    // resolved to 'success' without sending anything. Now it really hits the
+    // SMTP-backed route at /api/contact.
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fields),
+      })
+
+      const body = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        // Server-side validation failures (422) map back onto the same fields
+        if (res.status === 422 && body.fieldErrors) {
+          setErrors(body.fieldErrors)
+          const s: typeof shaking = {}
+          ;(Object.keys(body.fieldErrors) as (keyof FormErrors)[]).forEach((k) => { s[k] = true })
+          setShaking(s)
+          setTimeout(() => setShaking({}), 400)
+          setStatus('idle')
+          return
+        }
+        setErrorMessage(body.error || 'Something went wrong. Please try again.')
+        setStatus('error')
+        return
+      }
+
+      setStatus('success')
+    } catch (err) {
+      // Network failure / route crashed before returning JSON
+      console.error('Contact form network error:', err)
+      setErrorMessage('Network error. Please check your connection and try again.')
+      setStatus('error')
+    }
   }
 
   const successView = (
@@ -365,9 +399,9 @@ function ContactForm() {
             role="alert"
           >
             <p className="font-body text-sm text-sand-100/80">
-              Something went wrong. Please try again or email us directly at{' '}
-              <a href="mailto:hello@wanderlust.travel" className="text-gold-500 hover:underline">
-                hello@wanderlust.travel
+              {errorMessage || 'Something went wrong. Please try again or email us directly at'}{' '}
+              <a href="mailto:hello@cruxadventure.com" className="text-gold-500 hover:underline">
+                hello@cruxadventure.com
               </a>
             </p>
             <button
@@ -482,7 +516,7 @@ function ContactForm() {
             onChange={(e) => set('destination', e.target.value)}
             className={selectCls}
           >
-            {['Bali, Indonesia', 'Santorini, Greece', 'Maldives', 'Kyoto, Japan', 'Patagonia', 'Multiple Destinations', 'Not Sure Yet'].map((o) => (
+            {['Kashmir Great Lakes Trek', 'Annapurna Base Camp', 'Everest Base Camp', 'Gulmarg & Sonmarg', 'Multiple Destinations', 'Not Sure Yet'].map((o) => (
               <option key={o} value={o} className="bg-navy-900 text-sand-100">{o}</option>
             ))}
           </select>
@@ -552,7 +586,7 @@ function ContactForm() {
               </div>
             </div>
             <span className="font-body text-sm leading-relaxed text-sand-100/60">
-              I agree to receive travel inspiration and offers from Wanderlust.{' '}
+              I agree to receive travel inspiration and offers from Cruxadventure.{' '}
               <span className="text-sand-100/40">Unsubscribe anytime.</span>
             </span>
           </label>
@@ -603,8 +637,8 @@ export function ContactSection() {
       title: 'Email Us',
       content: (
         <>
-          <a href="mailto:hello@wanderlust.travel" className="block hover:text-gold-500 transition-colors">hello@wanderlust.travel</a>
-          <a href="mailto:support@wanderlust.travel" className="block hover:text-gold-500 transition-colors">support@wanderlust.travel</a>
+          <a href="mailto:hello@cruxadventure.com" className="block hover:text-gold-500 transition-colors">hello@cruxadventure.com</a>
+          <a href="mailto:support@cruxadventure.com" className="block hover:text-gold-500 transition-colors">support@cruxadventure.com</a>
         </>
       ),
     },
@@ -613,8 +647,9 @@ export function ContactSection() {
       title: 'Call Us',
       content: (
         <>
-          <a href="tel:+18009263357" className="block hover:text-gold-500 transition-colors">+1 (800) 926-3357</a>
-          <span className="block text-sand-100/40">Mon–Fri, 9am–6pm PST</span>
+          {/* 🔧 TODO: replace with real number — matches BRAND.phone in app/api/contact/route.ts */}
+          <a href="tel:+910000000000" className="block hover:text-gold-500 transition-colors">+91 00000 00000</a>
+          <span className="block text-sand-100/40">Mon–Sat, 9am–6pm IST</span>
         </>
       ),
     },
@@ -623,8 +658,9 @@ export function ContactSection() {
       title: 'Visit Us',
       content: (
         <>
-          <span className="block">340 Pine Street, Suite 800</span>
-          <span className="block">San Francisco, CA 94104</span>
+          {/* 🔧 TODO: replace with real address — matches BRAND.address in app/api/contact/route.ts */}
+          <span className="block">Cruxadventure HQ, [Street / Area]</span>
+          <span className="block">Srinagar, J&amp;K [PIN]</span>
         </>
       ),
     },
@@ -763,7 +799,7 @@ export function ContactSection() {
           >
             <div className="glass overflow-hidden rounded-3xl h-80 border border-white/8">
               <iframe
-                title="Wanderlust office location — Bemina, Srinagar"
+                title="Cruxadventure office location — Bemina, Srinagar"
                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d26436.845680551443!2d74.74848423975433!3d34.079620431351856!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x38e190041d354a61%3A0x19501295963a23b2!2sBemina%2C%20Srinagar!5e0!3m2!1sen!2sin!4v1779961027950!5m2!1sen!2sin"
                 width="100%"
                 height="100%"
@@ -772,7 +808,7 @@ export function ContactSection() {
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
                 style={{ filter: 'invert(90%) hue-rotate(180deg)', border: 0 }}
-                aria-label="Map showing Wanderlust office at 340 Pine Street, San Francisco"
+                aria-label="Map showing Cruxadventure office in Bemina, Srinagar"
               />
             </div>
           </motion.div>

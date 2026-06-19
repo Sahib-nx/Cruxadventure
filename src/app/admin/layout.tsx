@@ -117,16 +117,20 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
+  const path = usePathname()
   const router = useRouter()
 
   useEffect(() => {
     if (typeof window === 'undefined') return
 
+    if (path === '/admin/login') {
+      setCheckingAuth(false)
+      return
+    }
+
     const s = sessionStorage.getItem('admin_secret')
     if (!s) {
-      router.push('/admin/login')
-      // Schedule state update to avoid "setState in effect body" warnings.
-      setTimeout(() => setCheckingAuth(false), 0)
+      router.replace('/admin/login')
       return
     }
 
@@ -140,16 +144,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         if (!res.ok) {
           sessionStorage.removeItem('admin_secret')
-          router.push('/admin/login')
+          router.replace('/admin/login')
+          return
         }
       } catch {
         sessionStorage.removeItem('admin_secret')
-        router.push('/admin/login')
+        router.replace('/admin/login')
+        return
       } finally {
         setCheckingAuth(false)
       }
     })()
-  }, [])
+  }, [router])
 
   if (checkingAuth) {
     return (

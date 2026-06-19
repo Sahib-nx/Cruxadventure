@@ -59,7 +59,7 @@ export function Navbar() {
           {/* CTA + Hamburger */}
           <div className="flex items-center gap-4">
             <Link
-              href="#planner"
+              href="/contact"
               className={cn(
                 'hidden lg:inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-body font-medium text-sm',
                 'bg-gold-500 text-navy-900 transition-all duration-300',
