@@ -80,6 +80,15 @@ export function ExperienceShowcase() {
   const inView     = useInView(sectionRef, { once: true, margin: '-60px' })
 
   const active = experiences[activeIdx]
+  const total  = experiences.length
+
+  // Wrap around: forward from last goes to first, backward from first goes to last
+  function goNext() {
+    setActiveIdx((i) => (i + 1) % total)
+  }
+  function goPrev() {
+    setActiveIdx((i) => (i - 1 + total) % total)
+  }
 
   return (
     <section
@@ -94,7 +103,7 @@ export function ExperienceShowcase() {
         {/* ── Desktop: two-column layout ────────────────────── */}
         <div className="lg:grid lg:grid-cols-12 lg:gap-16">
 
-          {/* LEFT — Sticky heading + nav */}
+          {/* LEFT — Sticky heading + prev/next controls */}
           <div className="lg:col-span-4 lg:sticky lg:top-28 lg:self-start mb-12 lg:mb-0">
             <motion.div
               initial={{ opacity: 0, x: -32 }}
@@ -121,45 +130,49 @@ export function ExperienceShowcase() {
               {/* Counter */}
               <div className="font-display text-display-xl text-gold-500/20 font-semibold leading-none mb-8 select-none">
                 {String(activeIdx + 1).padStart(2, '0')}
-                <span className="text-display-sm text-sand-100/15"> / {String(experiences.length).padStart(2, '0')}</span>
+                <span className="text-display-sm text-sand-100/15"> / {String(total).padStart(2, '0')}</span>
               </div>
 
-              {/* Nav list */}
-              <nav className="flex flex-col gap-1" aria-label="Experience navigation">
-                {experiences.map((exp, i) => (
-                  <button
-                    key={exp.id}
-                    onClick={() => setActiveIdx(i)}
-                    className={cn(
-                      'group flex items-center gap-4 px-4 py-3 rounded-xl text-left transition-all duration-300',
-                      i === activeIdx
-                        ? 'bg-gold-500/10 border border-gold-500/20'
-                        : 'hover:bg-white/5 border border-transparent',
-                    )}
-                    aria-current={i === activeIdx ? 'true' : undefined}
-                  >
-                    {/* Index dot */}
-                    <span className={cn(
-                      'w-1.5 h-1.5 rounded-full flex-shrink-0 transition-all duration-300',
-                      i === activeIdx ? 'bg-gold-500 scale-150' : 'bg-sand-100/20 group-hover:bg-sand-100/40',
-                    )} />
-                    <div className="flex-1 min-w-0">
-                      <div className={cn(
-                        'font-body text-sm font-medium truncate transition-colors duration-200',
-                        i === activeIdx ? 'text-sand-100' : 'text-sand-100/50 group-hover:text-sand-100/80',
-                      )}>
-                        {exp.title}
-                      </div>
-                      <div className="font-body text-xs text-sand-100/30 mt-0.5">{exp.location}</div>
-                    </div>
-                    {i === activeIdx && (
-                      <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-body font-medium', exp.categoryColor)}>
-                        {exp.category}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </nav>
+              {/* Prev / Next controls */}
+              <div className="flex items-center gap-3" role="group" aria-label="Browse experiences">
+                <button
+                  onClick={goPrev}
+                  aria-label="Previous experience"
+                  className={cn(
+                    'flex items-center justify-center w-12 h-12 rounded-full',
+                    'glass border border-white/10 text-sand-100/70',
+                    'hover:text-navy-900 hover:bg-gold-500 hover:border-gold-500',
+                    'transition-all duration-300 hover:-translate-x-0.5',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500',
+                  )}
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                  </svg>
+                </button>
+
+                <button
+                  onClick={goNext}
+                  aria-label="Next experience"
+                  className={cn(
+                    'flex items-center justify-center w-12 h-12 rounded-full',
+                    'bg-gold-500 text-navy-900',
+                    'hover:bg-gold-400 hover:shadow-gold',
+                    'transition-all duration-300 hover:translate-x-0.5',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500',
+                  )}
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                  </svg>
+                </button>
+
+                {/* Current experience name — replaces the old nav list's labeling role */}
+                <div className="flex-1 min-w-0 pl-1">
+                  <p className="font-body text-sm font-medium text-sand-100 truncate">{active.title}</p>
+                  <p className="font-body text-xs text-sand-100/40">{active.location}</p>
+                </div>
+              </div>
             </motion.div>
           </div>
 
@@ -248,6 +261,28 @@ export function ExperienceShowcase() {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Mobile/tablet arrow controls — overlaid on the image for thumb reach */}
+                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-3 lg:hidden pointer-events-none">
+                  <button
+                    onClick={goPrev}
+                    aria-label="Previous experience"
+                    className="pointer-events-auto flex items-center justify-center w-10 h-10 rounded-full glass border border-white/10 text-sand-100/80 active:scale-90 transition-transform"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={goNext}
+                    aria-label="Next experience"
+                    className="pointer-events-auto flex items-center justify-center w-10 h-10 rounded-full glass border border-white/10 text-sand-100/80 active:scale-90 transition-transform"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg>
+                  </button>
                 </div>
               </motion.div>
             </AnimatePresence>

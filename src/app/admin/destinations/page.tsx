@@ -9,13 +9,13 @@ import type { Destination } from '@/types'
 
 interface PaginatedResponse {
   destinations: Destination[]
-  total:        number
-  totalPages:   number
-  page:         number
+  total: number
+  totalPages: number
+  page: number
 }
 
-const REGIONS   = ['All', 'Kashmir', 'Nepal'] as const
-const FEATURED  = ['All', 'Featured', 'Not Featured'] as const
+const REGIONS = ['All', 'Kashmir', 'Nepal'] as const
+const FEATURED = ['All', 'Featured', 'Not Featured'] as const
 
 // ─── Delete confirm modal ─────────────────────────────────────────────────────
 
@@ -91,8 +91,8 @@ function Toast({ message, type }: { message: string; type: 'success' | 'error' }
   return (
     <motion.div
       initial={{ opacity: 0, y: 24, x: '-50%' }}
-      animate={{ opacity: 1, y: 0,  x: '-50%' }}
-      exit={{  opacity: 0, y: 24,   x: '-50%' }}
+      animate={{ opacity: 1, y: 0, x: '-50%' }}
+      exit={{ opacity: 0, y: 24, x: '-50%' }}
       className={cn(
         'fixed bottom-6 left-1/2 z-50 flex items-center gap-2 px-5 py-3 rounded-full text-sm font-medium shadow-lg border backdrop-blur-xl',
         type === 'success'
@@ -117,15 +117,15 @@ function Toast({ message, type }: { message: string; type: 'success' | 'error' }
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function DestinationsListPage() {
-  const [data,         setData]         = useState<PaginatedResponse | null>(null)
-  const [loading,      setLoading]      = useState(true)
-  const [search,       setSearch]       = useState('')
-  const [region,       setRegion]       = useState<typeof REGIONS[number]>('All')
+  const [data, setData] = useState<PaginatedResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [region, setRegion] = useState<typeof REGIONS[number]>('All')
   const [featuredFilter, setFeaturedFilter] = useState<typeof FEATURED[number]>('All')
-  const [page,         setPage]         = useState(1)
+  const [page, setPage] = useState(1)
   const [deleteTarget, setDeleteTarget] = useState<Destination | null>(null)
-  const [deleting,     setDeleting]     = useState(false)
-  const [toast,        setToast]        = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type })
@@ -135,13 +135,13 @@ export default function DestinationsListPage() {
   const fetchDestinations = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams({ page: String(page), pageSize: '15' })
-    if (search)  params.set('search',   search)
+    if (search) params.set('search', search)
     if (region !== 'All') params.set('region', region)
-    if (featuredFilter === 'Featured')     params.set('featured', 'true')
+    if (featuredFilter === 'Featured') params.set('featured', 'true')
     if (featuredFilter === 'Not Featured') params.set('featured', 'false')
 
     try {
-      const res  = await fetch(`/api/admin/destinations?${params}`)
+      const res = await fetch(`/api/admin/destinations?${params}`)
       const json = await res.json()
       setData(json)
     } catch {
@@ -182,9 +182,9 @@ export default function DestinationsListPage() {
   async function toggleFeatured(dest: Destination) {
     try {
       const res = await fetch(`/api/admin/destinations/${dest._id}`, {
-        method:  'PATCH',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ featured: !dest.featured }),
+        body: JSON.stringify({ featured: !dest.featured }),
       })
       if (!res.ok) throw new Error()
       showToast(
@@ -378,10 +378,10 @@ export default function DestinationsListPage() {
                     </button>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1.5">
                       <Link
                         href={`/admin/destinations/${dest._id}/edit`}
-                        className="p-2 rounded-xl text-sand-100/40 hover:text-gold-400 hover:bg-gold-500/8 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500"
+                        className="p-2 rounded-xl text-amber-400 hover:text-yellow-300 hover:bg-amber-500/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500"
                         aria-label={`Edit ${dest.name}`}
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -390,7 +390,7 @@ export default function DestinationsListPage() {
                       </Link>
                       <button
                         onClick={() => setDeleteTarget(dest)}
-                        className="p-2 rounded-xl text-sand-100/40 hover:text-red-400 hover:bg-red-500/8 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+                        className="p-2 rounded-xl text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
                         aria-label={`Delete ${dest.name}`}
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

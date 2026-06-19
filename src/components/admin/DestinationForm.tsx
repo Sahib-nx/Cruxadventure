@@ -35,6 +35,8 @@ const CATEGORIES: DestinationCategory[] = [
   'Luxury', 'Adventure', 'Trekking', 'Nature', 'Camping', 'Honeymoon', 'Snow', 'Family',
 ]
 const SEASONS: Season[] = ['Spring', 'Summer', 'Autumn', 'Winter']
+const MAX_GALLERY_IMAGES = 6
+const MAX_DESCRIPTION_LENGTH = 280
 
 // ─── Field components ─────────────────────────────────────────────────────────
 
@@ -77,13 +79,14 @@ function TextInput({
 }
 
 function TextArea({
-  value, onChange, placeholder, rows = 3, error,
+  value, onChange, placeholder, rows = 3, error, maxLength,
 }: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
   rows?: number
   error?: string
+  maxLength?: number
 }) {
   return (
     <div className="space-y-1">
@@ -92,6 +95,7 @@ function TextArea({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
+        maxLength={maxLength}
         className={cn(
           'w-full rounded-xl border bg-white/5 px-4 py-2.5 text-sm text-sand-100 placeholder:text-sand-100/25 resize-none transition-all focus:outline-none focus:ring-2',
           error
@@ -114,6 +118,53 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
+// ─── Image URL helpers ────────────────────────────────────────────────────────
+
+/**
+ * Detects "share" links from Google Photos / Google Drive / Google Search etc.
+ * that LOOK like image URLs but actually resolve to an HTML page, not raw image
+ * bytes. Next.js <Image> (and the <img> tag itself) needs a DIRECT image URL,
+ * so pasting a Google share link breaks rendering ("upstream image response
+ * failed" / broken image icon).
+ */
+function isLikelyNonDirectGoogleUrl(url: string): boolean {
+  try {
+    const u = new URL(url)
+    const host = u.hostname.replace(/^www\./, '')
+
+    // drive.google.com/file/d/... or open?id=... -> HTML viewer page, not an image
+    if (host === 'drive.google.com') return true
+
+    // photos.google.com / photos.app.goo.gl share links -> HTML page
+    if (host === 'photos.google.com' || host === 'photos.app.goo.gl') return true
+
+    // plain google.com/imgres or google.com/url (image search result page, not the image)
+    if (host === 'google.com' && (u.pathname === '/imgres' || u.pathname === '/url')) return true
+
+    return false
+  } catch {
+    return false
+  }
+}
+
+/** A very loose check that the URL at least points at something that *could* be an image. */
+function looksLikeDirectImageUrl(url: string): boolean {
+  if (!url) return false
+  try {
+    const u = new URL(url)
+    const path = u.pathname.toLowerCase()
+    const hasImageExt = /\.(jpe?g|png|webp|avif|gif)$/.test(path)
+    // Cloudinary, imgix, etc. often have no extension but a recognizable image-serving host/path
+    const knownImageHost =
+      u.hostname.includes('res.cloudinary.com') ||
+      u.hostname.includes('images.unsplash.com') ||
+      u.hostname.includes('lh3.googleusercontent.com') // direct Google *content* host (not drive/photos share pages)
+    return hasImageExt || knownImageHost
+  } catch {
+    return false
+  }
+}
+
 // ─── Image Upload Field ───────────────────────────────────────────────────────
 
 function ImageUploadField({
@@ -134,6 +185,8 @@ function ImageUploadField({
   const inputRef              = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadErr, setUploadErr] = useState('')
+  const [urlWarning, setUrlWarning] = useState('')
+  const [imgBroken, setImgBroken] = useState(false)
 
   async function handleFile(file: File) {
     setUploadErr('')
@@ -146,6 +199,8 @@ function ImageUploadField({
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Upload failed')
       onChange(data.url)
+      setUrlWarning('')
+      setImgBroken(false)
     } catch (e: unknown) {
       setUploadErr(e instanceof Error ? e.message : 'Upload failed')
     } finally {
@@ -159,17 +214,41 @@ function ImageUploadField({
     if (file) handleFile(file)
   }
 
+  function handleUrlChange(v: string) {
+    setImgBroken(false)
+    if (v && isLikelyNonDirectGoogleUrl(v)) {
+      setUrlWarning(
+        "This looks like a Google Drive/Photos share link, not a direct image URL — it will show as a broken image. Right-click the image and choose \"Copy image address\", or upload the file directly instead.",
+      )
+    } else if (v && !looksLikeDirectImageUrl(v)) {
+      setUrlWarning(
+        'This URL doesn\u2019t look like a direct image link (no image extension). If the image doesn\u2019t appear below, try uploading the file directly instead.',
+      )
+    } else {
+      setUrlWarning('')
+    }
+    onChange(v)
+  }
+
   return (
     <div className="space-y-1.5">
       <FieldLabel required={required}>{label}</FieldLabel>
 
       {/* Preview */}
-      {value && (
+      {value && !imgBroken && (
         <div className="relative w-full h-36 rounded-xl overflow-hidden border border-white/10 bg-navy-950/40 mb-2">
-          <Image src={value} alt="Preview" fill sizes="400px" className="object-cover" />
+          <Image
+            src={value}
+            alt="Preview"
+            fill
+            sizes="400px"
+            className="object-cover"
+            unoptimized={isLikelyNonDirectGoogleUrl(value) || !looksLikeDirectImageUrl(value)}
+            onError={() => setImgBroken(true)}
+          />
           <button
             type="button"
-            onClick={() => onChange('')}
+            onClick={() => { onChange(''); setUrlWarning(''); setImgBroken(false) }}
             className="absolute top-2 right-2 w-6 h-6 rounded-full bg-navy-950/80 border border-white/15 flex items-center justify-center text-sand-100/60 hover:text-red-400 transition-colors"
             aria-label="Remove image"
           >
@@ -177,6 +256,27 @@ function ImageUploadField({
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+        </div>
+      )}
+
+      {/* Broken image fallback */}
+      {value && imgBroken && (
+        <div className="relative w-full rounded-xl border border-red-500/30 bg-red-500/5 p-4 mb-2 flex items-start gap-3">
+          <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-red-400">
+              This URL couldn&apos;t be loaded as an image. Google Drive/Photos share links don&apos;t work here — please upload the file directly, or paste a direct image link (ending in .jpg, .png, etc).
+            </p>
+            <button
+              type="button"
+              onClick={() => { onChange(''); setUrlWarning(''); setImgBroken(false) }}
+              className="text-[10px] text-red-400/70 hover:text-red-300 underline mt-1"
+            >
+              Clear and try again
+            </button>
+          </div>
         </div>
       )}
 
@@ -214,10 +314,18 @@ function ImageUploadField({
       <input
         type="url"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => handleUrlChange(e.target.value)}
         placeholder="https://res.cloudinary.com/…"
-        className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs text-sand-100/60 placeholder:text-sand-100/20 focus:outline-none focus:border-gold-500/30 focus:ring-1 focus:ring-gold-500/15 transition-all"
+        className={cn(
+          'w-full rounded-xl border bg-white/5 px-4 py-2 text-xs text-sand-100/60 placeholder:text-sand-100/20 focus:outline-none focus:ring-1 transition-all',
+          urlWarning
+            ? 'border-amber-500/40 focus:border-amber-500/50 focus:ring-amber-500/15'
+            : 'border-white/10 focus:border-gold-500/30 focus:ring-gold-500/15',
+        )}
       />
+      {urlWarning && !imgBroken && (
+        <p className="text-[11px] text-amber-400/90 leading-relaxed">{urlWarning}</p>
+      )}
 
       <input
         ref={inputRef}
@@ -244,11 +352,23 @@ function GalleryUpload({
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [limitMsg, setLimitMsg] = useState('')
+
+  const remaining = MAX_GALLERY_IMAGES - images.length
+  const atLimit = remaining <= 0
 
   async function handleFiles(files: FileList) {
+    if (atLimit) {
+      setLimitMsg(`Gallery is limited to ${MAX_GALLERY_IMAGES} images. Remove one to add another.`)
+      return
+    }
+    setLimitMsg('')
+    const filesToUpload = Array.from(files).slice(0, remaining)
+    const skipped = files.length - filesToUpload.length
+
     setUploading(true)
     const uploaded: string[] = []
-    for (const file of Array.from(files)) {
+    for (const file of filesToUpload) {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('folder', 'gallery')
@@ -260,6 +380,10 @@ function GalleryUpload({
     }
     onChange([...images, ...uploaded])
     setUploading(false)
+
+    if (skipped > 0) {
+      setLimitMsg(`Only added ${filesToUpload.length} image(s) — gallery limit is ${MAX_GALLERY_IMAGES}.`)
+    }
   }
 
   return (
@@ -272,7 +396,7 @@ function GalleryUpload({
               <Image src={url} alt={`Gallery ${i + 1}`} fill sizes="100px" className="object-cover" />
               <button
                 type="button"
-                onClick={() => onChange(images.filter((_, j) => j !== i))}
+                onClick={() => { onChange(images.filter((_, j) => j !== i)); setLimitMsg('') }}
                 className="absolute inset-0 bg-navy-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                 aria-label="Remove image"
               >
@@ -288,9 +412,14 @@ function GalleryUpload({
       {/* Upload trigger */}
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={uploading}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-white/15 hover:border-gold-500/30 text-xs text-sand-100/40 hover:text-sand-100/70 transition-all disabled:opacity-50"
+        onClick={() => { if (!atLimit) inputRef.current?.click(); else setLimitMsg(`Gallery is limited to ${MAX_GALLERY_IMAGES} images. Remove one to add another.`) }}
+        disabled={uploading || atLimit}
+        className={cn(
+          'flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed text-xs transition-all disabled:opacity-50',
+          atLimit
+            ? 'border-white/8 text-sand-100/25 cursor-not-allowed'
+            : 'border-white/15 hover:border-gold-500/30 text-sand-100/40 hover:text-sand-100/70',
+        )}
       >
         {uploading ? (
           <div className="w-3.5 h-3.5 border-2 border-gold-500/30 border-t-gold-500 rounded-full animate-spin" />
@@ -299,8 +428,10 @@ function GalleryUpload({
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
         )}
-        {uploading ? 'Uploading…' : 'Add gallery images'}
+        {uploading ? 'Uploading…' : atLimit ? `Gallery full (${MAX_GALLERY_IMAGES}/${MAX_GALLERY_IMAGES})` : `Add gallery images (${images.length}/${MAX_GALLERY_IMAGES})`}
       </button>
+
+      {limitMsg && <p className="text-[11px] text-amber-400/90">{limitMsg}</p>}
 
       <input
         ref={inputRef}
@@ -308,7 +439,7 @@ function GalleryUpload({
         accept="image/jpeg,image/png,image/webp,image/avif"
         multiple
         className="hidden"
-        onChange={(e) => { if (e.target.files?.length) handleFiles(e.target.files) }}
+        onChange={(e) => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = '' }}
       />
     </div>
   )
@@ -437,6 +568,12 @@ function toSlug(name: string): string {
     .replace(/-+/g, '-')
 }
 
+// ─── Currency helper ──────────────────────────────────────────────────────────
+
+function formatINR(amount: number): string {
+  return new Intl.NumberFormat('en-IN').format(amount)
+}
+
 // ─── Main DestinationForm ─────────────────────────────────────────────────────
 
 interface DestinationFormProps {
@@ -468,14 +605,25 @@ export function DestinationForm({
     if (!slugManual) set('slug', toSlug(name))
   }
 
+  function handleDescriptionChange(v: string) {
+    // Hard stop — admin physically cannot type past the limit.
+    set('shortDescription', v.slice(0, MAX_DESCRIPTION_LENGTH))
+  }
+
   function validate(): boolean {
     const e: Partial<Record<keyof DestinationFormValues, string>> = {}
     if (!form.name)             e.name             = 'Name is required'
     if (!form.slug)             e.slug             = 'Slug is required'
     if (!form.shortDescription) e.shortDescription = 'Description is required'
+    if (form.shortDescription.length > MAX_DESCRIPTION_LENGTH) {
+      e.shortDescription = `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer`
+    }
     if (form.categories.length === 0) e.categories = 'Select at least one category'
     if (!form.thumbnail)        e.thumbnail        = 'Thumbnail is required'
     if (!form.heroImage)        e.heroImage        = 'Hero image is required'
+    if (form.gallery.length > MAX_GALLERY_IMAGES) {
+      e.gallery = `Gallery can have at most ${MAX_GALLERY_IMAGES} images`
+    }
     if (!form.avgPackagePrice)  e.avgPackagePrice  = 'Package price is required'
     if (!form.avgStayPrice)     e.avgStayPrice     = 'Stay price is required'
     if (!form.avgTransportPrice) e.avgTransportPrice = 'Transport price is required'
@@ -536,13 +684,21 @@ export function DestinationForm({
             <FieldLabel required>Short Description</FieldLabel>
             <TextArea
               value={form.shortDescription}
-              onChange={(v) => set('shortDescription', v)}
+              onChange={handleDescriptionChange}
               placeholder="A cinematic 1–2 sentence description shown on destination cards…"
               rows={2}
               error={errors.shortDescription}
+              maxLength={MAX_DESCRIPTION_LENGTH}
             />
-            <p className="text-[10px] text-sand-100/20 text-right">
-              {form.shortDescription.length} / 280
+            <p className={cn(
+              'text-[10px] text-right',
+              form.shortDescription.length >= MAX_DESCRIPTION_LENGTH
+                ? 'text-red-400'
+                : form.shortDescription.length >= MAX_DESCRIPTION_LENGTH - 30
+                  ? 'text-amber-400'
+                  : 'text-sand-100/20',
+            )}>
+              {form.shortDescription.length} / {MAX_DESCRIPTION_LENGTH}
             </p>
           </div>
 
@@ -621,12 +777,13 @@ export function DestinationForm({
         <div className="mt-6 space-y-1.5">
           <FieldLabel>Gallery</FieldLabel>
           <GalleryUpload images={form.gallery} onChange={(v) => set('gallery', v)} />
+          {errors.gallery && <p className="text-xs text-red-400">{errors.gallery}</p>}
         </div>
       </div>
 
       {/* ── Pricing ── */}
       <div>
-        <SectionTitle>Pricing (USD)</SectionTitle>
+        <SectionTitle>Pricing (INR)</SectionTitle>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {(
             [
@@ -639,12 +796,13 @@ export function DestinationForm({
             <div key={key} className="space-y-1.5">
               <FieldLabel required>{label}</FieldLabel>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sand-100/30 text-sm">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sand-100/30 text-sm">₹</span>
                 <input
                   type="number"
                   min={0}
+                  step={1}
                   value={form[key] || ''}
-                  onChange={(e) => set(key, Number(e.target.value))}
+                  onChange={(e) => set(key, Math.round(Number(e.target.value)))}
                   className={cn(
                     'w-full rounded-xl border bg-white/5 pl-7 pr-4 py-2.5 text-sm text-sand-100 placeholder:text-sand-100/25 transition-all focus:outline-none focus:ring-2',
                     error
@@ -654,6 +812,9 @@ export function DestinationForm({
                   placeholder="0"
                 />
               </div>
+              {!!form[key] && (
+                <p className="text-[10px] text-sand-100/25">₹{formatINR(form[key] as number)}</p>
+              )}
               {error && <p className="text-xs text-red-400">{error}</p>}
             </div>
           ))}

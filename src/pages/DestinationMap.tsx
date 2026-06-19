@@ -4,22 +4,23 @@
  * DestinationsPage.tsx
  *
  * Filter hierarchy:
- *   1. Region tabs  — "All" | "Kashmir" | "Nepal"   (derived from destination.country)
- *   2. CategoryFilters — multi-select experience tags (derived from destination.tags)
+ *   1. Search bar       — fuzzy search via /api/destinations/search?q=
+ *   2. Region tabs      — "All" | "Kashmir" | "Nepal"   (derived from destination.country)
+ *   3. CategoryFilters  — multi-select experience tags (derived from destination.tags)
  *
- * Both filters compose: a card must match the active region AND have at least one
- * of the active category tags (or show all if neither filter is set).
+ * Search takes priority: when a query is active, region + category filters apply
+ * on top of the search results returned by the API.
  *
  * ─── FUTURE: switching to backend images ────────────────────────────────────
  * Every place that needs changing when images come from an API is marked with:
  *   // 🔌 BACKEND: <explanation>
- * Search for that string to find all swap points.
  * ────────────────────────────────────────────────────────────────────────────
  */
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
 import Image from 'next/image'
+import { SafeImage } from '@/components/ui/SafeImage'
 import { useRouter } from 'next/navigation'
 import { SectionWrapper } from '@/components/ui/SectionWrapper'
 import { CategoryFilters } from '@/components/ui/Categoryfilters'
@@ -27,8 +28,6 @@ import { cn } from '@/lib/utils'
 import type { DestinationCategory } from '@/types'
 
 // ─── Region filter ────────────────────────────────────────────────────────────
-// Derived from destination.country — add more countries here if you expand later
-// 🔌 BACKEND: if regions come from an API, replace this with a fetched list
 type Region = 'All' | 'Kashmir' | 'Nepal'
 
 const REGIONS: { value: Region; icon: string; label: string }[] = [
@@ -37,33 +36,43 @@ const REGIONS: { value: Region; icon: string; label: string }[] = [
   { value: 'Nepal', icon: '⛰', label: 'Nepal' },
 ]
 
-// Maps destination.country → Region tab
 function countryToRegion(country: string): Region | null {
   if (country === 'India') return 'Kashmir'
   if (country === 'Nepal') return 'Nepal'
-  return null // future-proof: unknown countries still show under "All"
+  return null
 }
 
-// Adapt backend destination -> frontend shape used by this component
 function adaptDestination(d: any) {
   const region = d.region ?? ''
   return {
-    id: d.slug ?? d._id,
+    id: d.slug ?? d._id,          // used for routing → /destinationMap/[slug]
+    slug: d.slug,
     name: d.name,
     image: d.thumbnail ?? d.heroImage ?? '/BgImg.jpg',
     country: region === 'Kashmir' ? 'India' : region || 'Nepal',
-    bestSeason: Array.isArray(d.bestSeason) ? (d.bestSeason[0] ?? '') : (d.bestSeason ?? ''),
+    bestSeason: (Array.isArray(d.bestSeason) ? d.bestSeason : d.bestSeason ? [d.bestSeason] : []).slice(0, 4) as string[],
     highlights: d.popularActivities ?? [],
     tagline: d.shortDescription ?? '',
-    rating: typeof d.popularity === 'number' ? Math.max(0, Math.min(5, +(d.popularity / 20).toFixed(1))) : 0,
+    rating: typeof d.popularity === 'number'
+      ? Math.max(0, Math.min(5, +(d.popularity / 20).toFixed(1)))
+      : 0,
     priceFrom: d.avgPackagePrice ?? d.avgStayPrice ?? null,
     duration: d.duration ?? 'Varies',
-    tags: d.tags ?? [],
+    tags: Array.from(new Set([...(d.categories ?? []), ...(d.tags ?? [])])),
   }
 }
 
-// ─── Star Rating ──────────────────────────────────────────────────────────────
+// ─── Debounce hook ────────────────────────────────────────────────────────────
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(t)
+  }, [value, delay])
+  return debounced
+}
 
+// ─── Star Rating ──────────────────────────────────────────────────────────────
 function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex items-center gap-0.5" aria-label={`Rating: ${rating} out of 5`}>
@@ -95,7 +104,7 @@ function StarRating({ rating }: { rating: number }) {
 // ─── Destination Card ─────────────────────────────────────────────────────────
 
 interface CardProps {
-  destination: any
+  destination: ReturnType<typeof adaptDestination>
   index: number
 }
 
@@ -103,7 +112,9 @@ function DestinationCard({ destination, index }: CardProps) {
   const router = useRouter()
   const [hovered, setHovered] = useState(false)
 
+  // Route to /destinationMap/[slug] — the slug is stored in destination.id
   function handleClick() {
+    if (!destination.id) return
     router.push(`/destinationMap/${destination.id}`)
   }
 
@@ -111,7 +122,7 @@ function DestinationCard({ destination, index }: CardProps) {
     hidden: { opacity: 0, y: 48, scale: 0.97 },
     visible: {
       opacity: 1, y: 0, scale: 1,
-      transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const, delay: index * 0.1 },
+      transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const, delay: index * 0.08 },
     },
     exit: {
       opacity: 0, scale: 0.95, y: 24,
@@ -139,7 +150,7 @@ function DestinationCard({ destination, index }: CardProps) {
       initial="hidden"
       animate="visible"
       exit="exit"
-      className="group relative overflow-hidden rounded-2xl cursor-pointer"
+      className="group relative overflow-hidden rounded-2xl cursor-pointer aspect-[4/5] sm:aspect-[3/4]"
       style={{ aspectRatio: '3/4' }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -149,19 +160,8 @@ function DestinationCard({ destination, index }: CardProps) {
       onKeyDown={(e) => e.key === 'Enter' && handleClick()}
       aria-label={`Explore ${destination.name}, ${destination.country}`}
     >
-      {/*
-       * 🔌 BACKEND: Card image
-       * Currently reads from destination.image (Unsplash URL in static data).
-       * When images come from your API, destination.image will be a CDN URL
-       * returned by your backend — no change needed here as long as the field
-       * name stays `image`. If the field changes (e.g. `imageUrl`, `thumbnail`),
-       * update `destination.image` → `destination.<newField>` in this one spot.
-       *
-       * For loading states, wrap this in a Suspense boundary or add a
-       * blur placeholder: add `placeholder="blur" blurDataURL={destination.blurHash}`
-       * once your API returns blur hashes.
-       */}
-      <Image
+      {/* 🔌 BACKEND: Card image — swap `destination.image` if field name changes */}
+      <SafeImage
         src={destination.image}
         alt={`${destination.name}, ${destination.country}`}
         fill
@@ -170,36 +170,33 @@ function DestinationCard({ destination, index }: CardProps) {
         priority={index < 3}
       />
 
-      {/* Card gradient overlay */}
       <div className="absolute inset-0 bg-card-gradient" />
 
-      {/* Hover tint */}
       <motion.div
         className="absolute inset-0 bg-navy-900/30"
         animate={{ opacity: hovered ? 1 : 0 }}
         transition={{ duration: 0.3 }}
       />
 
-      {/* Top badges — region label + best season */}
+      {/* Top badges */}
       <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-2">
-        {/* Region pill (Kashmir / Nepal) */}
         <span className="glass text-xs font-body font-medium text-white/80 px-3 py-1 rounded-full border border-white/10">
-          {/*
-           * Shows country name as the region label.
-           * "India" destinations are labelled "Kashmir" for marketing clarity.
-           */}
           {destination.country === 'India' ? 'Kashmir' : destination.country}
         </span>
-
-        {/* Best season badge */}
-        <span className="bg-gold-500/90 text-navy-900 text-xs font-body font-semibold px-3 py-1 rounded-full whitespace-nowrap">
-          {destination.bestSeason}
-        </span>
+        <div className="flex flex-wrap gap-1 justify-end max-w-[55%]">
+          {destination.bestSeason.map((season) => (
+            <span
+              key={season}
+              className="bg-gold-500/90 text-navy-900 text-[10px] font-body font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+            >
+              {season}
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Bottom content */}
       <div className="absolute bottom-0 left-0 right-0 p-5 flex flex-col gap-2">
-        {/* Highlights — slide up on hover */}
         <AnimatePresence>
           {hovered && (
             <motion.ul
@@ -227,7 +224,7 @@ function DestinationCard({ destination, index }: CardProps) {
         <h3 className="font-display text-display-md text-sand-100 leading-none tracking-tight">
           {destination.name}
         </h3>
-        <p className="text-sm font-body text-white/60">{destination.tagline}</p>
+        <p className="text-sm font-body text-white/60 line-clamp-2 leading-snug">{destination.tagline}</p>
 
         <div className="flex items-center justify-between mt-1">
           <StarRating rating={destination.rating ?? 0} />
@@ -263,12 +260,85 @@ function DestinationCard({ destination, index }: CardProps) {
   )
 }
 
-// ─── Region Tab Bar ───────────────────────────────────────────────────────────
+// ─── Search Bar ───────────────────────────────────────────────────────────────
+interface SearchBarProps {
+  value: string
+  onChange: (v: string) => void
+  isSearching: boolean
+}
 
+function SearchBar({ value, onChange, isSearching }: SearchBarProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <div className="relative w-full max-w-xl mx-auto">
+      {/* Search icon */}
+      <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+        {isSearching ? (
+          /* Spinner while fetching */
+          <svg
+            className="w-4 h-4 text-gold-500 animate-spin"
+            fill="none" viewBox="0 0 24 24" aria-hidden="true"
+          >
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        ) : (
+          <svg
+            className="w-4 h-4 text-white/40"
+            fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round"
+              d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+          </svg>
+        )}
+      </div>
+
+      <input
+        ref={inputRef}
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Search destinations, activities, tags…"
+        aria-label="Search destinations"
+        className={cn(
+          'w-full glass border border-white/10 rounded-full',
+          'pl-11 pr-10 py-2.5',
+          'text-sm font-body text-white placeholder:text-white/30',
+          'focus:outline-none focus:ring-2 focus:ring-gold-500/60 focus:border-gold-500/40',
+          'transition-all duration-200',
+        )}
+      />
+
+      {/* Clear button */}
+      <AnimatePresence>
+        {value && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.7 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => { onChange(''); inputRef.current?.focus() }}
+            className="absolute inset-y-0 right-3 flex items-center px-1 text-white/30 hover:text-white/70 transition-colors"
+            aria-label="Clear search"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ─── Region Tab Bar ───────────────────────────────────────────────────────────
 interface RegionTabsProps {
   active: Region
   onChange: (r: Region) => void
-  allDestinations?: any[]
+  allDestinations?: ReturnType<typeof adaptDestination>[]
 }
 
 function RegionTabs({ active, onChange, allDestinations = [] }: RegionTabsProps) {
@@ -280,10 +350,6 @@ function RegionTabs({ active, onChange, allDestinations = [] }: RegionTabsProps)
     >
       {REGIONS.map(({ value, icon, label }) => {
         const isActive = active === value
-
-        // Count per region for badge
-        // 🔌 BACKEND: if destinations come from an API/hook, replace `destinations`
-        // here with your fetched array (e.g. `allDestinations` from useSWR)
         const count =
           value === 'All'
             ? allDestinations.length
@@ -323,14 +389,22 @@ function RegionTabs({ active, onChange, allDestinations = [] }: RegionTabsProps)
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-
 export function DestinationMap() {
   const [activeRegion, setActiveRegion] = useState<Region>('All')
   const [activeCategories, setActiveCategories] = useState<DestinationCategory[]>([])
-  const [destinations, setDestinations] = useState<any[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isSearching, setIsSearching] = useState(false)
+
+  // Full list — loaded once on mount from the admin/destinations endpoint
+  const [allDestinations, setAllDestinations] = useState<ReturnType<typeof adaptDestination>[]>([])
+  // Search results — populated whenever a query is active
+  const [searchResults, setSearchResults] = useState<ReturnType<typeof adaptDestination>[]>([])
+
   const gridRef = useRef<HTMLDivElement>(null)
   const inView = useInView(gridRef, { once: true, margin: '-80px' })
+  const debouncedQuery = useDebounce(searchQuery, 380)
 
+  // ── Initial load ─────────────────────────────────────────────────────────
   useEffect(() => {
     let mounted = true
     async function load() {
@@ -339,8 +413,7 @@ export function DestinationMap() {
         if (!res.ok) return
         const body = await res.json()
         const list = Array.isArray(body.destinations) ? body.destinations : body
-        const adapted = list.map(adaptDestination)
-        if (mounted) setDestinations(adapted)
+        if (mounted) setAllDestinations(list.map(adaptDestination))
       } catch (e) {
         console.error('Failed to load destinations', e)
       }
@@ -349,22 +422,49 @@ export function DestinationMap() {
     return () => { mounted = false }
   }, [])
 
+  // ── Search via /api/destinations/search ──────────────────────────────────
+  useEffect(() => {
+    let mounted = true
+
+    if (!debouncedQuery || debouncedQuery.length < 2) {
+      setSearchResults([])
+      setIsSearching(false)
+      return
+    }
+
+    setIsSearching(true)
+
+    async function doSearch() {
+      try {
+        const params = new URLSearchParams({ q: debouncedQuery })
+        // Pass region to the search API too if one is selected — reduces server work
+        if (activeRegion !== 'All') params.set('region', activeRegion)
+
+        const res = await fetch(`/api/destinations/search?${params.toString()}`)
+        if (!res.ok) return
+        const body = await res.json()
+        const list = Array.isArray(body) ? body : []
+        if (mounted) setSearchResults(list.map(adaptDestination))
+      } catch (e) {
+        console.error('Search failed', e)
+      } finally {
+        if (mounted) setIsSearching(false)
+      }
+    }
+    doSearch()
+
+    return () => { mounted = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery])
+
   // ── Filtering logic ──────────────────────────────────────────────────────
-  //
-  // 🔌 BACKEND: When destinations come from an API, replace `destinations` here
-  // with your fetched array. Keep the filter logic the same — it only reads
-  // `.country` and `.tags`, both of which your API will return.
-  //
-  // Example with SWR:
-  //   const { data: destinations = [] } = useSWR<Destination[]>('/api/destinations')
-  //
-  const filtered = destinations.filter((d) => {
-    // 1. Region match
+  // When a search query is active, filter over search results;
+  // otherwise filter over the full list.
+  const baseList = debouncedQuery.length >= 2 ? searchResults : allDestinations
+  const destinations = baseList.filter((d) => {
     const regionMatch =
       activeRegion === 'All' || countryToRegion(d.country) === activeRegion
 
-    // 2. Category match — destination.tags is string[], DestinationCategory is a
-    //    string union; the cast is safe because tags values match the union exactly.
     const catMatch =
       activeCategories.length === 0 ||
       activeCategories.some((cat) => (d.tags as DestinationCategory[]).includes(cat))
@@ -372,10 +472,18 @@ export function DestinationMap() {
     return regionMatch && catMatch
   })
 
+  function clearAll() {
+    setActiveRegion('All')
+    setActiveCategories([])
+    setSearchQuery('')
+  }
+
   const containerVariants = {
     hidden: {},
     visible: { transition: { staggerChildren: 0.08 } },
   }
+
+  const isFiltered = searchQuery || activeRegion !== 'All' || activeCategories.length > 0
 
   return (
     <>
@@ -384,15 +492,7 @@ export function DestinationMap() {
         className="relative flex min-h-[320px] items-center justify-center"
         style={{ height: '40vh' }}
       >
-        {/*
-         * 🔌 BACKEND: Hero background image
-         * Currently points to a local file in /public.
-         * To use a remote image from your API/CMS, replace the src with
-         * the URL returned by your backend. Also add the domain to
-         * next.config.js → images.remotePatterns so Next.js allows it.
-         *
-         * Example: src={heroData.backgroundImageUrl}
-         */}
+        {/* 🔌 BACKEND: Hero background — swap src when using remote image */}
         <Image
           src="/BgImg.jpg"
           alt=""
@@ -402,10 +502,7 @@ export function DestinationMap() {
           priority
           aria-hidden="true"
         />
-
-        {/* Gradient scrim */}
         <div className="absolute inset-0 bg-hero-gradient" />
-        {/* Dark overlay for text legibility */}
         <div className="absolute inset-0" style={{ background: 'rgba(10,22,40,0.68)' }} />
 
         {/* Hero copy */}
@@ -429,7 +526,7 @@ export function DestinationMap() {
 
           <div className="flex justify-center">
             <p className="font-body text-base leading-relaxed text-sand-100/70 lg:whitespace-nowrap text-center">
-              From the snow-draped valleys of Kashmir to the sacred peaks of Nepal , discover journeys that stay with you long after the trail ends.
+              From the snow-draped valleys of Kashmir to the sacred peaks of Nepal, discover journeys that stay with you long after the trail ends.
             </p>
           </div>
         </motion.div>
@@ -438,13 +535,27 @@ export function DestinationMap() {
       {/* ── Filter Bar (sticky) ────────────────────────────────────────────── */}
       <div className="sticky top-15 lg:top-20 z-40 bg-navy-900/85 backdrop-blur-md border-b border-white/5">
         <div className="mx-auto max-w-7xl px-4">
+
+          {/* Search row */}
+          <div className="py-3 border-b border-white/5">
+            <SearchBar
+              value={searchQuery}
+              onChange={setSearchQuery}
+              isSearching={isSearching}
+            />
+          </div>
+
           {/* Region tabs */}
           <div className="py-3 border-b border-white/5">
-            <RegionTabs active={activeRegion} onChange={setActiveRegion} allDestinations={destinations} />
+            <RegionTabs
+              active={activeRegion}
+              onChange={setActiveRegion}
+              allDestinations={allDestinations}
+            />
           </div>
 
           {/* Experience category chips */}
-          <div className="py-2.5 lg:flex lg:justify-center ">
+          <div className="py-2.5 lg:flex lg:justify-center">
             <CategoryFilters
               active={activeCategories}
               onChange={setActiveCategories}
@@ -468,9 +579,9 @@ export function DestinationMap() {
           layout
         >
           <AnimatePresence mode="popLayout">
-            {filtered.map((destination, i) => (
+            {destinations.map((destination, i) => (
               <DestinationCard
-                key={destination.id}
+                key={destination.id ?? destination.slug ?? i}
                 destination={destination}
                 index={i}
               />
@@ -478,35 +589,73 @@ export function DestinationMap() {
           </AnimatePresence>
 
           {/* Empty state */}
-          {filtered.length === 0 && (
+          {!isSearching && destinations.length === 0 && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="col-span-full text-center py-20"
             >
-              <p className="font-body text-white/40 text-lg">
-                No{' '}
-                {activeRegion !== 'All' && (
-                  <span className="text-gold-500">{activeRegion} </span>
-                )}
-                destinations match
-                {activeCategories.length > 0 && (
-                  <>
-                    {' '}the{' '}
-                    <span className="text-gold-500">
-                      {activeCategories.join(', ')}
-                    </span>
-                    {' '}filter{activeCategories.length > 1 ? 's' : ''}
-                  </>
-                )}
-                .
-              </p>
-              <button
-                onClick={() => { setActiveRegion('All'); setActiveCategories([]) }}
-                className="mt-4 text-sm text-white/50 underline underline-offset-4 hover:text-white/80 transition-colors"
+              {searchQuery.length >= 2 ? (
+                <>
+                  <p className="font-body text-white/40 text-lg">
+                    No results for{' '}
+                    <span className="text-gold-500">&quot;{searchQuery}&quot;</span>
+                    {activeRegion !== 'All' && (
+                      <> in <span className="text-gold-500">{activeRegion}</span></>
+                    )}
+                    .
+                  </p>
+                  <p className="mt-2 font-body text-white/25 text-sm">
+                    Try a different keyword, or clear the filters below.
+                  </p>
+                </>
+              ) : (
+                <p className="font-body text-white/40 text-lg">
+                  No{' '}
+                  {activeRegion !== 'All' && (
+                    <span className="text-gold-500">{activeRegion} </span>
+                  )}
+                  destinations match
+                  {activeCategories.length > 0 && (
+                    <>
+                      {' '}the{' '}
+                      <span className="text-gold-500">
+                        {activeCategories.join(', ')}
+                      </span>
+                      {' '}filter{activeCategories.length > 1 ? 's' : ''}
+                    </>
+                  )}
+                  .
+                </p>
+              )}
+
+              {isFiltered && (
+                <button
+                  onClick={clearAll}
+                  className="mt-4 text-sm text-white/50 underline underline-offset-4 hover:text-white/80 transition-colors"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </motion.div>
+          )}
+
+          {/* Loading state while search is in-flight */}
+          {isSearching && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="col-span-full text-center py-16"
+            >
+              <svg
+                className="mx-auto w-8 h-8 text-gold-500 animate-spin"
+                fill="none" viewBox="0 0 24 24" aria-hidden="true"
               >
-                Clear all filters
-              </button>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <p className="mt-3 font-body text-white/30 text-sm">Finding destinations…</p>
             </motion.div>
           )}
         </motion.div>
@@ -519,9 +668,20 @@ export function DestinationMap() {
           className="mt-10 text-center text-sm font-body text-white/30"
           aria-live="polite"
         >
-          Showing{' '}
-          <span className="text-gold-500 font-semibold">{filtered.length}</span> of{' '}
-          <span className="text-white/50">{destinations.length}</span> curated destinations
+          {searchQuery.length >= 2 ? (
+            <>
+              Found{' '}
+              <span className="text-gold-500 font-semibold">{destinations.length}</span> result
+              {destinations.length !== 1 ? 's' : ''} for{' '}
+              <span className="text-white/50">&quot;{searchQuery}&quot;</span>
+            </>
+          ) : (
+            <>
+              Showing{' '}
+              <span className="text-gold-500 font-semibold">{destinations.length}</span> of{' '}
+              <span className="text-white/50">{allDestinations.length}</span> curated destinations
+            </>
+          )}
         </motion.p>
       </SectionWrapper>
     </>

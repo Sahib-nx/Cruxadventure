@@ -51,6 +51,28 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'www.nepalecotrekking.com',
       },
+      // ── Direct Google image-CONTENT hosts (NOT share-link viewer pages) ──
+      // lh3/lh4/lh5/lh6 are Google's actual image CDN — these serve raw
+      // image bytes and are safe for next/image. drive.google.com and
+      // photos.google.com are intentionally NOT whitelisted: those are
+      // HTML viewer pages, not images, and are rejected at the form/API
+      // validation layer instead of being allowed here.
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh4.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh5.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh6.googleusercontent.com',
+      },
     ],
   },
 }

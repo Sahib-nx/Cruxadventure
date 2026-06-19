@@ -3,6 +3,8 @@ import type { Destination } from '@/types'
 
 export type DestinationDoc = HydratedDocument<Destination>;
 
+const MAX_GALLERY_IMAGES = 6 // keep in sync with DestinationForm.tsx + the API routes
+
 const DestinationSchema = new Schema<DestinationDoc>(
   {
     slug: {
@@ -34,7 +36,14 @@ const DestinationSchema = new Schema<DestinationDoc>(
     },
     thumbnail: { type: String, required: true },   // Cloudinary URL
     heroImage: { type: String, required: true },   // Cloudinary URL
-    gallery: { type: [String], default: [] },       // Cloudinary URLs
+    gallery: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: (arr: string[]) => arr.length <= MAX_GALLERY_IMAGES,
+        message: `Gallery can have at most ${MAX_GALLERY_IMAGES} images`,
+      },
+    }, // Cloudinary URLs
     avgPackagePrice: { type: Number, required: true, min: 0 },
     avgStayPrice: { type: Number, required: true, min: 0 },
     avgTransportPrice: { type: Number, required: true, min: 0 },
